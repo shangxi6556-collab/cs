@@ -1,120 +1,157 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-<meta charset="UTF-8" />
-<title>币安红包 - 持10000枚才能抢 BNB</title>
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.umd.min.js"></script>
-<style>
-  body { margin:0; background:linear-gradient(135deg,#ff3b3b,#ffb800); color:white; font-family:'Microsoft YaHei'; min-height:100vh; display:flex; align-items:center; justify-content:center; }
-  .box { background:rgba(0,0,0,0.25); backdrop-filter:blur(15px); padding:40px; border-radius:30px; width:90%; max-width:500px; text-align:center; }
-  h1 { font-size:36px; margin:0 0 20px; }
-  .timer { font-size:70px; font-weight:bold; margin:30px 0; text-shadow:0 0 20px #000; }
-  .hold { font-size:24px; margin:20px 0; padding:15px; background:#c62828; border-radius:20px; }
-  button { width:85%; padding:20px; font-size:28px; background:#e74c3c; border:none; border-radius:60px; margin:15px 0; cursor:pointer; }
-  button:disabled { background:#666; cursor:not-allowed; }
-  .warn { color:#ff1744; font-size:22px; font-weight:bold; margin:15px 0; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>币安红包 - 每小时抢 BNB</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.umd.min.js"></script>
+  <style>
+    body { margin:0; overflow:hidden; background:linear-gradient(135deg,#ff3b3b,#ff9800); font-family:'Microsoft YaHei'; color:white; }
+    canvas { position:fixed; top:0; left:0; z-index:1; }
+    .box { position:relative; z-index:10; text-align:center; padding:40px; max-width:500px; margin:20px auto; background:rgba(0,0,0,0.3); backdrop-filter:blur(15px); border-radius:30px; }
+    h1 { font-size:42px; margin:0 0 20px; text-shadow:0 0 20px #fff; }
+    .timer { font-size:80px; font-weight:bold; margin:30px 0; text-shadow:0 0 20px #000; }
+    .info { font-size:24px; margin:15px; }
+    .hold { font-size:26px; padding:20px; margin:20px; border-radius:20px; }
+    .warn { color:#ff1744; font-weight:bold; }
+    button { width:85%; padding:20px; font-size:30px; background:#e74c3c; border:none; border-radius:60px; margin:15px 0; cursor:pointer; }
+    button:hover { background:#c0392b; }
+    button:disabled { background:#666; cursor:not-allowed; }
+    .rank { margin-top:30px; }
+    .rank-item { background:rgba(255,255,255,0.3); padding:15px; margin:8px; border-radius:20px; }
+  </style>
 </head>
 <body>
-<div class="box">
-  <h1>币安红包 </h1>
-<h1> BNB RED PACKET</h1>
-  <div id="status">点击连接钱包</div>
-  <div class="timer" id="timer">00:00:00</div>
-  <div class="info">本轮红包总额：<b id="amount">0</b> BNB</div>
-  <div class="info">剩余名额：<b id="slots">0</b> 个</div>
+  <canvas id="canvas"></canvas>
+  <div class="box">
+    <h1>币安红包 BNBRED</h1>
+    <div id="status" class="info">点击连接钱包</div>
+    <div class="timer" id="timer">00:00:00</div>
+    <div class="info">本轮红包总额：<b id="amount">0</b> BNB</div>
+    <div class="info">剩余名额：<b id="slots">0</b> 个</div>
 
-  <!-- 持币检测提示区 -->
-  <div id="holdInfo" class="hold" id="holdInfo">检测中...</div>
+    <!-- 持币检测提示 -->
+    <div id="holdInfo" class="hold">检测中...</div>
 
+    <button id="connectBtn">连接 MetaMask</button>
+    <button id="claimBtn" disabled>立即抢红包</button>
 
-  <button id="connectBtn">连接 MetaMask</button>
-  <button id="claimBtn" disabled>立即抢红包</button>
-</div>
+    <div class="rank">
+      <h3>本轮手气王</h3>
+      <div id="ranking">暂无记录</div>
+    </div>
+  </div>
 
-<script>
-// ←←←← 唯一要改的地方：填你部署的红包池地址 ←←←←
-const POOL_ADDRESS = "0xbCfDA13c51fb56ED877a541fC7394E01Bc166313";          // ← 改这里
-// ←←←← 第二行要改：你的代币地址（Flap上线后自动有） ←←←←
-const TOKEN_ADDRESS = "0x986540c77eaf8385b5c9a85caf68eca10f7e4444";           // ← 改这里
-  }
-}
-
-const ABI = [
-  "function claim()",
-  "function roundStartTime() view returns (uint256)",
-  "function remainingSlots() view returns (uint256)",
-  "event Claimed(address indexed user, uint256 amount, uint256 round)"
-];
-
-let provider, signer, contract, account;
-
-// 修复版连接函数（加强兼容性）
-async function connectWallet() {
-  if (typeof window.ethereum === 'undefined') {
-    alert("请安装 MetaMask！下载: https://metamask.io");
-    return;
-  }
-  try {
-    if (window.ethereum.providers) {
-      // 多钱包支持
-      await window.ethereum.request({ method: 'eth_requestAccounts' });
-    } else {
-      await window.ethereum.request({ method: 'eth_requestAccounts' });
+  <!-- 满屏红包雨特效 -->
+  <script>
+    const canvas = document.getElementById('canvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+    const packets = [];
+    for(let i=0;i<50;i++){
+      packets.push({
+        x: Math.random()*canvas.width,
+        y: Math.random()*canvas.height - canvas.height,
+        size: 40+Math.random()*40,
+        speed: 2+Math.random()*4,
+        rotation: Math.random()*360
+      });
     }
-    provider = new ethers.BrowserProvider(window.ethereum);
-    signer = await provider.getSigner();
-    account = await signer.getAddress();
-    contract = new ethers.Contract(POOL_ADDRESS, ABI, signer);
+    function draw(){ 
+      ctx.clearRect(0,0,canvas.width,canvas.height); 
+      packets.forEach(p=>{
+        p.y += p.speed; 
+        if(p.y > canvas.height) p.y = -100;
+        p.rotation += 2;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation*Math.PI/180);
+        ctx.font = p.size+'px Arial';
+        ctx.fillStyle = '#fff';
+        ctx.fillText("红包", -p.size/2, p.size/3);
+        ctx.restore();
+      }); 
+      requestAnimationFrame(draw); 
+    }
+    draw();
 
-    document.getElementById("status").innerHTML = `已连接: ${account.slice(0,6)}...${account.slice(-4)}`;
-    document.getElementById("connectBtn").disabled = true;
-    updateAll();
-    setInterval(updateAll, 3000);
-  } catch (e) {
-    alert("连接失败: " + e.message);
-  }
-}
+    // ←←←← 两行要改的地方 ←←←←
+    const POOL_ADDRESS = "0xbCfDA13c51fb56ED877a541fC7394E01Bc166313";     // ← 改这里！！！
+    const TOKEN_ADDRESS = "0x986540c77eaf8385b5c9a85caf68eca10f7e4444";      // ← 改这里！！！
 
-// 抢红包
-async function claim() {
-  if (!contract) return alert("请先连接钱包");
-  document.getElementById("claimBtn").disabled = true;
-  try {
-    const tx = await contract.claim();
-    await tx.wait();
-    alert("恭喜发财！BNB 已到账！");
-    updateAll();
-  } catch (e) {
-    alert("抢红包失败: " + (e.reason || e.message));
-    document.getElementById("claimBtn").disabled = false;
-  }
-}
+    const POOL_ABI = [
+      "function claim()",
+      "function roundStartTime() view returns (uint256)",
+      "function remainingSlots() view returns (uint256)"
+    ];
+    const TOKEN_ABI = ["function balanceOf(address) view returns (uint256)"];
 
-// 更新倒计时 + 总额 + 名额
-async function updateAll() {
-  if (!contract) return;
-  const block = await provider.getBlock("latest");
-  const now = block.timestamp;
-  const start = await contract.roundStartTime();
-  let left = 3600 - ((now - Number(start)) % 3600);
-  if (left < 0) left = 0;
-  const h = String(Math.floor(left/3600)).padStart(2,'0');
-  const m = String(Math.floor((left%3600)/60)).padStart(2,'0');
-  const s = String(left%60).padStart(2,'0');
-  document.getElementById("timer").textContent = `${h}:${m}:${s}`;
+    let provider, signer, poolContract, tokenContract, account;
+    let ranking = [];
 
-  const bal = await provider.getBalance(POOL_ADDRESS);
-  document.getElementById("amount").textContent = ethers.formatEther(bal);
-  const slots = await contract.remainingSlots();
-  document.getElementById("slots").textContent = slots.toString();
-  document.getElementById("claimBtn").disabled = slots == 0;
-}
+    async function connectWallet() {
+      if (!window.ethereum) return alert("请安装 MetaMask！");
+      provider = new ethers.BrowserProvider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = await provider.getSigner();
+      account = await signer.getAddress();
 
-document.getElementById("connectBtn").onclick = connectWallet;
-document.getElementById("claimBtn").onclick = claim;
-</script>
+      poolContract = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
+      tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, provider);
+
+      document.getElementById("status").innerHTML = `已连接 ${account.slice(0,6)}...${account.slice(-4)}`;
+      document.getElementById("connectBtn").disabled = true;
+      updateAll();
+      setInterval(updateAll, 3000);
+    }
+
+    async function claim() {
+      document.getElementById("claimBtn").disabled = true;
+      try {
+        const tx = await poolContract.claim();
+        await tx.wait();
+        alert("恭喜发财！BNB 已到账！");
+        updateAll();
+      } catch (e) {
+        alert("抢红包失败：" + (e.reason || e.message));
+        document.getElementById("claimBtn").disabled = false;
+      }
+    }
+
+    async function updateAll() {
+      if (!tokenContract || !account) return;
+
+      // 持币检测
+      const bal = await tokenContract.balanceOf(account);
+      const hold = Number(ethers.formatUnits(bal, 18));
+      if (hold >= 10000) {
+        document.getElementById("holdInfo").innerHTML = `✅ 已持币 ${hold.toLocaleString()} 枚（可抢）`;
+        document.getElementById("claimBtn").disabled = false;
+      } else {
+        document.getElementById("holdInfo").innerHTML = `❌ 当前持有 ${hold.toLocaleString()} 枚<br><span class="warn">需 ≥ 10,000 枚才能抢！</span>`;
+        document.getElementById("claimBtn").disabled = true;
+      }
+
+      // 其他数据（倒计时、总额等）
+      const block = await provider.getBlock("latest");
+      const now = block.timestamp;
+      const start = await poolContract.roundStartTime();
+      let left = 3600 - ((now - Number(start)) % 3600);
+      if (left < 0) left = 0;
+      const h = String(Math.floor(left/3600)).padStart(2,'0');
+      const m = String(Math.floor((left%3600)/60)).padStart(2,'0');
+      const s = String(left%60).padStart(2,'0');
+      document.getElementById("timer").textContent = `${h}:${m}:${s}`;
+
+      const balPool = await provider.getBalance(POOL_ADDRESS);
+      document.getElementById("amount").textContent = ethers.formatEther(balPool);
+      const slots = await poolContract.remainingSlots();
+      document.getElementById("slots").textContent = slots.toString();
+    }
+
+    document.getElementById("connectBtn").onclick = connectWallet;
+    document.getElementById("claimBtn").onclick = claim;
+  </script>
 </body>
-
 </html>
-
