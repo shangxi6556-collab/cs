@@ -44,43 +44,11 @@
 
   <!-- 满屏红包雨特效 -->
   <script>
-    const canvas = document.getElementById('canvas');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const ctx = canvas.getContext('2d');
-    const packets = [];
-    for(let i=0;i<50;i++){
-      packets.push({
-        x: Math.random()*canvas.width,
-        y: Math.random()*canvas.height - canvas.height,
-        size: 40+Math.random()*40,
-        speed: 2+Math.random()*4,
-        rotation: Math.random()*360
-      });
-    }
-    function draw(){ 
-      ctx.clearRect(0,0,canvas.width,canvas.height); 
-      packets.forEach(p=>{
-        p.y += p.speed; 
-        if(p.y > canvas.height) p.y = -100;
-        p.rotation += 2;
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation*Math.PI/180);
-        ctx.font = p.size+'px Arial';
-        ctx.fillStyle = '#fff';
-        ctx.fillText("红包", -p.size/2, p.size/3);
-        ctx.restore();
-      }); 
-      requestAnimationFrame(draw); 
-    }
-    draw();
+   <script>
+// ←←←← 唯一要改的地方：填你部署的红包池地址 ←←←←
+const POOL_ADDRESS = "0x你的红包池地址";   // ← 改这里！！！
 
-    // ←←←← 两行要改的地方 ←←←←
-    const POOL_ADDRESS = "0xbCfDA13c51fb56ED877a541fC7394E01Bc166313";     // ← 改这里！！！
-    const TOKEN_ADDRESS = "0x986540c77eaf8385b5c9a85caf68eca10f7e4444";      // ← 改这里！！！
-
-   const ABI = [
+const ABI = [
   "function claim()",
   "function roundStartTime() view returns (uint256)",
   "function remainingSlots() view returns (uint256)"
@@ -154,38 +122,11 @@ async function updateAll() {
 // 绑定按钮
 document.getElementById("connectBtn").onclick = connectWallet;
 document.getElementById("claimBtn").onclick = claim;
-      // 持币检测
-      const bal = await tokenContract.balanceOf(account);
-      const hold = Number(ethers.formatUnits(bal, 18));
-      if (hold >= 10000) {
-        document.getElementById("holdInfo").innerHTML = `✅ 已持币 ${hold.toLocaleString()} 枚（可抢）`;
-        document.getElementById("claimBtn").disabled = false;
-      } else {
-        document.getElementById("holdInfo").innerHTML = `❌ 当前持有 ${hold.toLocaleString()} 枚<br><span class="warn">需 ≥ 10,000 枚才能抢！</span>`;
-        document.getElementById("claimBtn").disabled = true;
-      }
-
-      // 其他数据（倒计时、总额等）
-      const block = await provider.getBlock("latest");
-      const now = block.timestamp;
-      const start = await poolContract.roundStartTime();
-      let left = 3600 - ((now - Number(start)) % 3600);
-      if (left < 0) left = 0;
-      const h = String(Math.floor(left/3600)).padStart(2,'0');
-      const m = String(Math.floor((left%3600)/60)).padStart(2,'0');
-      const s = String(left%60).padStart(2,'0');
-      document.getElementById("timer").textContent = `${h}:${m}:${s}`;
-
-      const balPool = await provider.getBalance(POOL_ADDRESS);
-      document.getElementById("amount").textContent = ethers.formatEther(balPool);
-      const slots = await poolContract.remainingSlots();
-      document.getElementById("slots").textContent = slots.toString();
-    }
-
- 
+</script>
   </script>
 </body>
 </html>
+
 
 
 
