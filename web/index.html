@@ -49,16 +49,20 @@ const ABI = [
 
 let provider, signer, contract, account;
 
-// 加强兼容性的连接函数
+// 修复版连接函数（加强兼容性）
 async function connectWallet() {
   if (typeof window.ethereum === 'undefined') {
-    alert("请先安装 MetaMask！下载地址：https://metamask.io");
+    alert("请安装 MetaMask！下载: https://metamask.io");
     return;
   }
-
   try {
+    if (window.ethereum.providers) {
+      // 多钱包支持
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+    } else {
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+    }
     provider = new ethers.BrowserProvider(window.ethereum);
-    await provider.send("eth_requestAccounts", []);
     signer = await provider.getSigner();
     account = await signer.getAddress();
     contract = new ethers.Contract(POOL_ADDRESS, ABI, signer);
@@ -68,7 +72,7 @@ async function connectWallet() {
     updateAll();
     setInterval(updateAll, 3000);
   } catch (e) {
-    alert("连接失败：" + e.message);
+    alert("连接失败: " + e.message);
   }
 }
 
@@ -82,12 +86,12 @@ async function claim() {
     alert("恭喜发财！BNB 已到账！");
     updateAll();
   } catch (e) {
-    alert("抢红包失败：" + (e.reason || e.message));
+    alert("抢红包失败: " + (e.reason || e.message));
     document.getElementById("claimBtn").disabled = false;
   }
 }
 
-// 更新数据（倒计时、总额、名额）
+// 更新倒计时 + 总额 + 名额
 async function updateAll() {
   if (!contract) return;
   const block = await provider.getBlock("latest");
@@ -113,3 +117,4 @@ document.getElementById("claimBtn").onclick = claim;
 </body>
 
 </html>
+
