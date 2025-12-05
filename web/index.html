@@ -40,70 +40,76 @@ const TOKEN_ADDRESS = "0x986540c77eaf8385b5c9a85caf68eca10f7e4444";           //
   }
 }
 
-const POOL_ABI = ["function claim()","function roundStartTime() view returns (uint256)","function remainingSlots() view returns (uint256)"];
-const TOKEN_ABI = ["function balanceOf(address) view returns (uint256)","function decimals() view returns (uint8)"];
+const ABI = [
+  "function claim()",
+  "function roundStartTime() view returns (uint256)",
+  "function remainingSlots() view returns (uint256)",
+  "event Claimed(address indexed user, uint256 amount, uint256 round)"
+];
 
-let provider, signer, poolContract, tokenContract, account;
+let provider, signer, contract, account;
 
-async function connect() {
-  if (!window.ethereum) return alert("请安装 MetaMask！");
-  provider = new ethers.BrowserProvider(window.ethereum);
-  await provider.send("eth_requestAccounts", []);
-  signer = await provider.getSigner();
-  account = await signer.getAddress();
-
-  poolContract = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
-  tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, provider);
-
-  document.getElementById("status").textContent = `已连接 ${account.slice(0,6)}...${account.slice(-4)}`;
-  document.getElementById("connectBtn").disabled = true;
-  updateAll();
-  setInterval(updateAll, 3000);
-}
-
-// 实时检测持币数量
-async function checkHold() {
-  if (!tokenContract || !account) {
-    document.getElementById("holdInfo").textContent = "请先连接钱包";
-    return false;
+// 加强兼容性的连接函数
+async function connectWallet() {
+  if (typeof window.ethereum === 'undefined') {
+    alert("请先安装 MetaMask！下载地址：https://metamask.io");
+    return;
   }
-  const bal = await tokenContract.balanceOf(account);
-  const hold = Number(ethers.formatUnits(bal, 18));
 
-  if (hold >= 10000) {
-    document.getElementById("holdInfo").style.background = "#2e7d32";
-    document.getElementById("holdInfo").textContent = `已持币 ${hold.toFixed(2)} 枚 ✅ 可抢红包`;
-    document.getElementById("claimBtn").disabled = false;
-    return true;
-  } else {
-    document.getElementById("holdInfo").style.background = "#c62828";
-    document.getElementById("holdInfo").innerHTML = `当前持有 ${hold.toFixed(2)} 枚<br><span class="warn">持有 ≥ 10,000 枚代币才可抢！</span>`;
-    document.getElementById("claimBtn").disabled = true;
-    return false;
+  try {
+    provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    signer = await provider.getSigner();
+    account = await signer.getAddress();
+    contract = new ethers.Contract(POOL_ADDRESS, ABI, signer);
+
+    document.getElementById("status").innerHTML = `已连接: ${account.slice(0,6)}...${account.slice(-4)}`;
+    document.getElementById("connectBtn").disabled = true;
+    updateAll();
+    setInterval(updateAll, 3000);
+  } catch (e) {
+    alert("连接失败：" + e.message);
   }
 }
 
+// 抢红包
 async function claim() {
-  if (!(await checkHold())) return;
+  if (!contract) return alert("请先连接钱包");
   document.getElementById("claimBtn").disabled = true;
   try {
-    const tx = await poolContract.claim();
+    const tx = await contract.claim();
     await tx.wait();
     alert("恭喜发财！BNB 已到账！");
     updateAll();
   } catch (e) {
-    alert("抢失败：" + (e.reason || e.message));
+    alert("抢红包失败：" + (e.reason || e.message));
     document.getElementById("claimBtn").disabled = false;
   }
 }
 
+// 更新数据（倒计时、总额、名额）
 async function updateAll() {
-  await checkHold();
-  // 其他倒计时、余额等逻辑略（你原来的代码直接粘进来就行）
+  if (!contract) return;
+  const block = await provider.getBlock("latest");
+  const now = block.timestamp;
+  const start = await contract.roundStartTime();
+  let left = 3600 - ((now - Number(start)) % 3600);
+  if (left < 0) left = 0;
+  const h = String(Math.floor(left/3600)).padStart(2,'0');
+  const m = String(Math.floor((left%3600)/60)).padStart(2,'0');
+  const s = String(left%60).padStart(2,'0');
+  document.getElementById("timer").textContent = `${h}:${m}:${s}`;
+
+  const bal = await provider.getBalance(POOL_ADDRESS);
+  document.getElementById("amount").textContent = ethers.formatEther(bal);
+  const slots = await contract.remainingSlots();
+  document.getElementById("slots").textContent = slots.toString();
+  document.getElementById("claimBtn").disabled = slots == 0;
 }
 
-document.getElementById("connectBtn").onclick = connect;
+document.getElementById("connectBtn").onclick = connectWallet;
 document.getElementById("claimBtn").onclick = claim;
 </script>
 </body>
+
 </html>
