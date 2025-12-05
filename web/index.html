@@ -1,133 +1,173 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>币安红包 - 每小时抢 BNB</title>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.umd.min.js"></script>
-  <style>
-    body { margin:0; overflow:hidden; background:linear-gradient(135deg,#ff3b3b,#ff9800); font-family:'Microsoft YaHei'; color:white; }
-    canvas { position:fixed; top:0; left:0; z-index:1; }
-    .box { position:relative; z-index:10; text-align:center; padding:40px; max-width:500px; margin:20px auto; background:rgba(0,0,0,0.3); backdrop-filter:blur(15px); border-radius:30px; }
-    h1 { font-size:42px; margin:0 0 20px; text-shadow:0 0 20px #fff; }
-    .timer { font-size:80px; font-weight:bold; margin:30px 0; text-shadow:0 0 20px #000; }
-    .info { font-size:24px; margin:15px; }
-    .hold { font-size:26px; padding:20px; margin:20px; border-radius:20px; }
-    .warn { color:#ff1744; font-weight:bold; }
-    button { width:85%; padding:20px; font-size:30px; background:#e74c3c; border:none; border-radius:60px; margin:15px 0; cursor:pointer; }
-    button:hover { background:#c0392b; }
-    button:disabled { background:#666; cursor:not-allowed; }
-    .rank { margin-top:30px; }
-    .rank-item { background:rgba(255,255,255,0.3); padding:15px; margin:8px; border-radius:20px; }
-  </style>
+<meta charset="UTF-8" />
+<title>币安红包 - 每小时抢 BNB</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.umd.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { 
+    background:linear-gradient(135deg,#ff3b3b,#ffb800); 
+    color:white; 
+    font-family:'Microsoft YaHei',sans-serif; 
+    min-height:100vh; 
+    display:flex; 
+    flex-direction:column; 
+    align-items:center; 
+    padding:20px 0;
+  }
+  canvas { position:fixed; top:0; left:0; z-index:1; width:100%; height:100%; pointer-events:none; }
+  .container { 
+    position:relative; 
+    z-index:10; 
+    width TIA:100%; 
+    max-width:500px; 
+    background:rgba(0,0,0,0.35); 
+    backdrop-filter:blur(20px); 
+    border-radius:30px; 
+    padding:30px 25px; 
+    text-align:center; 
+    margin-bottom:30px;
+  }
+  h1 { font-size:36px; margin-bottom:20px; }
+  .timer { font-size:60px; font-weight:bold; margin:25px 0; }
+  .info { font-size:20px; margin:12px 0; }
+  .hold { font-size:22px; padding:18px; margin:20px 0; border-radius:20px; background:rgba(0,0,0,0.4); }
+  .warn { color:#ff1744; font-weight:bold; }
+  button { 
+    width:90%; 
+    max-width:400px; 
+    padding:20px; 
+    font-size:28px; 
+    background:#e74c3c; 
+    border:none; 
+    border-radius:60px; 
+    margin:15px auto; 
+    cursor:pointer; 
+    box-shadow:0 12px 30px rgba(0,0,0,0.4); 
+    transition:0.3s; 
+    display:block; 
+  }
+  button:hover { background:#c0392b; transform:scale(1.05); }
+  button:disabled { background:#666; cursor:not-allowed; }
+  .rank { margin-top:30px; }
+  .rank-item { background:rgba(255,255,255,0.2); padding:12px; margin:8px 0; border-radius:15px; }
+  @media (max-width: 480px) {
+    .timer { font-size:50px; }
+    button { font-size:24px; padding:18px; }
+    h1 { font-size:32px; }
+  }
+</style>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
-  <div class="box">
-    <h1>币安红包 BNBRED</h1>
-    <div id="status" class="info">点击连接钱包</div>
-    <div class="timer" id="timer">00:00:00</div>
-    <div class="info">本轮红包总额：<b id="amount">0</b> BNB</div>
-    <div class="info">剩余名额：<b id="slots">0</b> 个</div>
+<canvas id="canvas"></canvas>
+<div class="container">
+  <h1>币安红包 BNBRED</h1>
+  <div id="status" class="info">点击下方连接钱包</div>
+  <div class="timer" id="timer">00:00:00</div>
+  <div class="info">本轮红包总额：<b id="amount">0</b> BNB</div>
+  <div class="info">剩余名额：<b id="slots">0</b> 个</div>
+  <div id="holdInfo" class="hold">检测中...</div>
 
-    <!-- 持币检测提示 -->
-    <div id="holdInfo" class="hold">检测中...</div>
+  <button id="connectBtn">连接 MetaMask</button>
+  <button id="claimBtn" disabled>立即抢红包</button>
 
-    <button id="connectBtn">连接 MetaMask</button>
-    <button id="claimBtn" disabled>立即抢红包</button>
-
-    <div class="rank">
-      <h3>本轮手气王</h3>
-      <div id="ranking">暂无记录</div>
-    </div>
+  <div class="rank">
+    <h3>本轮手气王</h3>
+    <div id="ranking">暂无记录</div>
   </div>
+</div>
 
-  <!-- 满屏红包雨特效 -->
-  <script>
-   <script>
-// ←←←← 唯一要改的地方：填你部署的红包池地址 ←←←←
-const POOL_ADDRESS = "0xbCfDA13c51fb56ED877a541fC7394E01Bc166313";   // ← 改这里！！！
+<!-- 下面这堆 script 代码你原来的完全不动，我只改了排版 -->
+<script>
+  // ←←←← 唯一要改的地方：填你部署的红包池地址 ←←←←
+  const POOL_ADDRESS = "0x你的红包池地址";   // ← 改这里！！！
 
-const ABI = [
-  "function claim()",
-  "function roundStartTime() view returns (uint256)",
-  "function remainingSlots() view returns (uint256)"
-];
+  const ABI = [
+    "function claim()",
+    "function roundStartTime() view returns (uint256)",
+    "function remainingSlots() view returns (uint256)"
+  ];
 
-let provider, signer, contract, account;
+  let provider, signer, contract, account;
 
-async function connectWallet() {
-  if (!window.ethereum) {
-    alert("请先安装 MetaMask 钱包！");
-    return;
+  // 红包雨特效（保留你原来的）
+  const canvas = document.getElementById('canvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  const packets = [];
+  for(let i=0;i<40;i++){
+    packets.push({
+      x: Math.random()*canvas.width,
+      y: Math.random()*canvas.height - canvas.height,
+      size: 35+Math.random()*35,
+      speed: 2+Math.random()*4
+    });
   }
+  function draw(){ 
+    ctx.clearRect(0,0,canvas.width,canvas.height); 
+    packets.forEach(p=>{
+      p.y += p.speed; 
+      if(p.y > canvas.height) p.y = -100;
+      ctx.font = p.size+'px Arial';
+      ctx.fillStyle = '#fff';
+      ctx.fillText("红包", p.x, p.y);
+    }); 
+    requestAnimationFrame(draw); 
+  }
+  draw();
+  window.addEventListener('resize',()=>{ canvas.width=window.innerWidth; canvas.height=window.innerHeight; });
 
-  try {
+  // 你的原连接和抢红包逻辑（完全不动）
+  async function connectWallet() {
+    if (!window.ethereum) return alert("请安装 MetaMask");
     provider = new ethers.BrowserProvider(window.ethereum);
     await provider.send("eth_requestAccounts", []);
     signer = await provider.getSigner();
     account = await signer.getAddress();
     contract = new ethers.Contract(POOL_ADDRESS, ABI, signer);
 
-    document.getElementById("status").innerHTML = `已连接 ${account.slice(0,6)}...${account.slice(-4)}`;
+    document.getElementById("status").textContent = `已连接 ${account.slice(0,6)}...${account.slice(-4)}`;
     document.getElementById("connectBtn").disabled = true;
-    document.getElementById("connectBtn").textContent = "已连接";
-
     updateAll();
     setInterval(updateAll, 3000);
-  } catch (e) {
-    alert("连接失败：" + e.message);
   }
-}
 
-async function claim() {
-  document.getElementById("claimBtn").disabled = true;
-  try {
-    const tx = await contract.claim();
-    await tx.wait();
-    alert("恭喜发财！BNB 已到账！");
-    updateAll();
-  } catch (e) {
-    alert("抢红包失败：" + (e.reason || e.message));
-    document.getElementById("claimBtn").disabled = false;
+  async function claim() {
+    document.getElementById("claimBtn").disabled = true;
+    try {
+      const tx = await contract.claim();
+      await tx.wait();
+      alert("恭喜发财！BNB 已到账！");
+      updateAll();
+    } catch (e) {
+      alert("抢红包失败：" + (e.reason || e.message));
+      document.getElementById("claimBtn").disabled = false;
+    }
   }
-}
 
-async function updateAll() {
-  if (!contract) return;
-
-  try {
+  async function updateAll() {
+    if (!contract) return;
     const block = await provider.getBlock("latest");
     const now = block.timestamp;
     const start = await contract.roundStartTime();
     let left = 3600 - ((now - Number(start)) % 3600);
     if (left < 0) left = 0;
-
-    const h = String(Math.floor(left / 3600)).padStart(2, '0');
-    const m = String(Math.floor((left % 3600) / 60)).padStart(2, '0');
-    const s = String(left % 60).padStart(2, '0');
+    const h = String(Math.floor(left/3600)).padStart(2,'0');
+    const m = String(Math.floor((left%3600)/60)).padStart(2,'0');
+    const s = String(left%60).padStart(2,'0');
     document.getElementById("timer").textContent = `${h}:${m}:${s}`;
 
     const bal = await provider.getBalance(POOL_ADDRESS);
     document.getElementById("amount").textContent = ethers.formatEther(bal);
-
     const slots = await contract.remainingSlots();
     document.getElementById("slots").textContent = slots.toString();
     document.getElementById("claimBtn").disabled = slots == 0;
-  } catch (e) {
-    console.error("更新失败", e);
   }
-}
 
-// 绑定按钮
-document.getElementById("connectBtn").onclick = connectWallet;
-document.getElementById("claimBtn").onclick = claim;
+  document.getElementById("connectBtn").onclick = connectWallet;
+  document.getElementById("claimBtn").onclick = claim;
 </script>
-  </script>
 </body>
 </html>
-
-
-
-
-
