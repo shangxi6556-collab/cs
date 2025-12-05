@@ -124,48 +124,36 @@ async function claim() {
     document.getElementById("claimBtn").disabled = false;
   }
 }
-    async function updateAll() {
+
+async function updateAll() {
   if (!contract) return;
 
   try {
     const block = await provider.getBlock("latest");
     const now = block.timestamp;
     const start = await contract.roundStartTime();
-    const left = 3600 - ((now - Number(start)) % 3600);
-    const timeLeft = left < 0 ? 0 : left;
+    let left = 3600 - ((now - Number(start)) % 3600);
+    if (left < 0) left = 0;
 
-    const h = String(Math.floor(timeLeft/3600)).padStart(2,'0');
-    const m = String(Math.floor((timeLeft%3600)/60)).padStart(2,'0');
-    const s = String(timeLeft%60).padStart(2,'0');
+    const h = String(Math.floor(left / 3600)).padStart(2, '0');
+    const m = String(Math.floor((left % 3600) / 60)).padStart(2, '0');
+    const s = String(left % 60).padStart(2, '0');
     document.getElementById("timer").textContent = `${h}:${m}:${s}`;
-
-    // 正确判断轮次是否结束
-    if (timeLeft === 0) {
-      document.getElementById("timer").textContent = "00:00:00";
-      document.getElementById("status").textContent = "本轮已结束，等机器人开新轮";
-      document.getElementById("claimBtn").disabled = true;
-      document.getElementById("claimBtn").textContent = "本轮已结束";
-      return;
-    }
 
     const bal = await provider.getBalance(POOL_ADDRESS);
     document.getElementById("amount").textContent = ethers.formatEther(bal);
 
     const slots = await contract.remainingSlots();
     document.getElementById("slots").textContent = slots.toString();
-
-    // 正确控制按钮状态
-    if (slots == 0) {
-      document.getElementById("claimBtn").disabled = true;
-      document.getElementById("claimBtn").textContent = "名额已满";
-    } else {
-      document.getElementById("claimBtn").disabled = false;
-      document.getElementById("claimBtn").textContent = "立即抢红包";
-    }
+    document.getElementById("claimBtn").disabled = slots == 0;
   } catch (e) {
-    console.error(e);
+    console.error("更新失败", e);
   }
 }
+
+// 绑定按钮
+document.getElementById("connectBtn").onclick = connectWallet;
+document.getElementById("claimBtn").onclick = claim;
       // 持币检测
       const bal = await tokenContract.balanceOf(account);
       const hold = Number(ethers.formatUnits(bal, 18));
@@ -194,10 +182,10 @@ async function claim() {
       document.getElementById("slots").textContent = slots.toString();
     }
 
-    document.getElementById("connectBtn").onclick = connectWallet;
-    document.getElementById("claimBtn").onclick = claim;
+ 
   </script>
 </body>
 </html>
+
 
 
