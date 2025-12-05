@@ -83,44 +83,47 @@
    const ABI = [
   "function claim()",
   "function roundStartTime() view returns (uint256)",
-  "function remainingSlots() view returns (uint256)",
-  "function currentRound() view returns (uint256)",     // 加这行
-  "event Claimed(address indexed user, uint256 amount, uint256 round)"
+  "function remainingSlots() view returns (uint256)"
 ];
-    const TOKEN_ABI = ["function balanceOf(address) view returns (uint256)"];
 
-    let provider, signer, poolContract, tokenContract, account;
-    let ranking = [];
+let provider, signer, contract, account;
 
-    async function connectWallet() {
-      if (!window.ethereum) return alert("请安装 MetaMask！");
-      provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      signer = await provider.getSigner();
-      account = await signer.getAddress();
+async function connectWallet() {
+  if (!window.ethereum) {
+    alert("请先安装 MetaMask 钱包！");
+    return;
+  }
 
-      poolContract = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
-      tokenContract = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, provider);
+  try {
+    provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    signer = await provider.getSigner();
+    account = await signer.getAddress();
+    contract = new ethers.Contract(POOL_ADDRESS, ABI, signer);
 
-      document.getElementById("status").innerHTML = `已连接 ${account.slice(0,6)}...${account.slice(-4)}`;
-      document.getElementById("connectBtn").disabled = true;
-      updateAll();
-      setInterval(updateAll, 3000);
-    }
+    document.getElementById("status").innerHTML = `已连接 ${account.slice(0,6)}...${account.slice(-4)}`;
+    document.getElementById("connectBtn").disabled = true;
+    document.getElementById("connectBtn").textContent = "已连接";
 
-    async function claim() {
-      document.getElementById("claimBtn").disabled = true;
-      try {
-        const tx = await poolContract.claim();
-        await tx.wait();
-        alert("恭喜发财！BNB 已到账！");
-        updateAll();
-      } catch (e) {
-        alert("抢红包失败：" + (e.reason || e.message));
-        document.getElementById("claimBtn").disabled = false;
-      }
-    }
+    updateAll();
+    setInterval(updateAll, 3000);
+  } catch (e) {
+    alert("连接失败：" + e.message);
+  }
+}
 
+async function claim() {
+  document.getElementById("claimBtn").disabled = true;
+  try {
+    const tx = await contract.claim();
+    await tx.wait();
+    alert("恭喜发财！BNB 已到账！");
+    updateAll();
+  } catch (e) {
+    alert("抢红包失败：" + (e.reason || e.message));
+    document.getElementById("claimBtn").disabled = false;
+  }
+}
     async function updateAll() {
   if (!contract) return;
 
@@ -196,4 +199,5 @@
   </script>
 </body>
 </html>
+
 
